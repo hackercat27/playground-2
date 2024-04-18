@@ -1,14 +1,27 @@
 package ca.hackercat.playground.math;
 
+import java.util.Random;
+
 public class PGMath {
     private PGMath() {}
 
     public static final double PI = 3.141592653589793d;
+    public static final double TAU = 6.283185307179586;
     public static final float PIf = 3.1415927f;
+    public static final float TAUf = 6.2831855f;
     private static final double DG_RDd = 0.017453292519943295;
     private static final double RD_DGd = 57.29577951308232;
     private static final float DG_RDf = 0.017453292f;
     private static final float RD_DGf = 57.29578f;
+
+    private static final Random random = new Random();
+
+    public static double randomd() {
+        return random.nextDouble();
+    }
+    public static float randomf() {
+        return random.nextFloat();
+    }
 
     public static float sin(float a) {
         return (float) Math.sin(a);
@@ -262,6 +275,38 @@ public class PGMath {
     public static float lerp(float a, float b, float t) {
         return a + ((b - a) * t);
     }
+    public static double cyclicalLerp(double a1, double a2, double t, double lowerEnd, double upperEnd) {
+        double range = Math.abs(lowerEnd - upperEnd);
+        double a3;
+        if (a2 < a1) {
+            a3 = a2 + range;
+        }
+        else {
+            a3 = a2 - range;
+        }
+        double dist12 = Math.abs(a2 - a1);
+        double dist13 = Math.abs(a3 - a1);
+        if (dist12 < dist13) {
+            return lerp(a1, a2, t);
+        }
+        return lerp(a1, a3, t);
+    }
+    public static float cyclicalLerp(float a1, float a2, float t, float lowerEnd, float upperEnd) {
+        float range = Math.abs(lowerEnd - upperEnd);
+        float a3;
+        if (a2 < a1) {
+            a3 = a2 + range;
+        }
+        else {
+            a3 = a2 - range;
+        }
+        double dist12 = Math.abs(a2 - a1);
+        double dist13 = Math.abs(a3 - a1);
+        if (dist12 < dist13) {
+            return lerp(a1, a2, t);
+        }
+        return lerp(a1, a3, t);
+    }
 
     public static int mod(int a, int b) {
         int c = a;
@@ -331,5 +376,33 @@ public class PGMath {
 
     public static double pow(double base, double exp) {
         return Math.pow(base, exp);
+    }
+
+    public static float pow(float base, float exp) {
+        return (float) Math.pow(base, exp);
+    }
+
+    public static boolean equals(double a, double b, double epsilon) {
+        return abs(a - b) < epsilon;
+    }
+
+    public static boolean equals(float a, float b, float epsilon) {
+        return abs(a - b) < epsilon;
+    }
+
+    public static double log10(double a) {
+        return Math.log10(a);
+    }
+
+    public static float log10(float a) {
+        return (float) Math.log10(a);
+    }
+
+    public static double ln(double a) {
+        return Math.log(a);
+    }
+
+    public static float ln(float a) {
+        return (float) Math.log(a);
     }
 }

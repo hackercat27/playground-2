@@ -3,7 +3,13 @@ package ca.hackercat.playground;
 import ca.hackercat.logging.Logger;
 import ca.hackercat.playground.io.PGKeyboard;
 import ca.hackercat.playground.io.PGMouse;
+import ca.hackercat.playground.io.sound.PGSoundEventManager;
+import ca.hackercat.playground.io.sound.PGSoundManager;
 import ca.hackercat.playground.math.PGMath;
+import org.lwjgl.openal.AL;
+import org.lwjgl.openal.ALC;
+import org.lwjgl.openal.ALCCapabilities;
+import org.lwjgl.openal.ALCapabilities;
 import javax.swing.JFrame;
 
 import java.awt.Color;
@@ -18,17 +24,32 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedList;
 import java.util.List;
 
+import static org.lwjgl.openal.ALC10.*;
+import static org.lwjgl.openal.ALC10.alcMakeContextCurrent;
+
 public class PGWindow {
+
+    private static final Logger LOGGER = Logger.get(PGWindow.class);
 
     public static final int EXIT_NORMAL = 0;
 
     private JFrame frame;
     private PGPanel panel;
 
+    private Object threadLock = new Object();
+
     private double tps = 30;
     private double fps = 60;
+
+    // OpenAL pointers
+    private long audioContext;
+    private long audioDevice;
+
+    private ALCCapabilities alcCapabilities;
+    private ALCapabilities alCapabilities;
 
     private boolean autoScale = true;
 
@@ -50,7 +71,7 @@ public class PGWindow {
     private long lastTickTimeMillis;
     private long lastFrameLengthMillis;
 
-    private Object[] objects = new Object[0x1000];
+    private List<PGObject> objects = new ArrayList<>();
 
     public PGWindow() {
         this(854, 480);
@@ -81,7 +102,36 @@ public class PGWindow {
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         frame.setVisible(true);
 
+        createOpenALContext();
+
         start();
+    }
+
+    private void createOpenALContext() {
+
+        String defaultDevice = alcGetString(0, ALC_DEFAULT_DEVICE_SPECIFIER);
+        audioDevice = alcOpenDevice(defaultDevice);
+
+        int[] attributes = new int[] {0};
+        audioContext = alcCreateContext(audioDevice, attributes);
+
+        alcMakeContextCurrent(audioContext);
+
+        alcCapabilities = ALC.createCapabilities(audioDevice);
+        alCapabilities = AL.createCapabilities(alcCapabilities);
+
+        if (!alCapabilities.OpenAL10) {
+            LOGGER.error("Audio library is not supported.");
+        }
+    }
+
+    private void destroyOpenALContext() {
+
+        alcMakeContextCurrent(audioContext);
+
+        alcCloseDevice(audioDevice);
+        alcDestroyContext(audioContext);
+
     }
 
     private void start() {
@@ -120,6 +170,7 @@ public class PGWindow {
                         if (remainingTime > 0) {
                             Thread.sleep(remainingTime);
                         }
+
                     }
                     catch (InterruptedException ignored) {}
                 }
@@ -132,23 +183,25 @@ public class PGWindow {
                 long endTimeMillis;
                 long startTimeMillis;
                 while (true) {
-                    long targetTickTimeMillis = (long) (1000 / tps);
+                        long targetTickTimeMillis = (long) (1000 / tps);
 
-                    startTimeMillis = System.currentTimeMillis();
+                        startTimeMillis = System.currentTimeMillis();
 
-                    update(1d / tps);
-                    endTimeMillis = System.currentTimeMillis();
-                    lastTickTimeMillis = endTimeMillis;
+                        try {
+                            update(1d / tps);
 
-                    long tickTime = endTimeMillis - startTimeMillis;
+                            endTimeMillis = System.currentTimeMillis();
 
-                    try {
-                        long remainingTime = targetTickTimeMillis - tickTime;
-                        if (remainingTime > 0) {
-                            Thread.sleep(remainingTime);
+                            lastTickTimeMillis = endTimeMillis;
+
+                            long tickTime = endTimeMillis - startTimeMillis;
+
+                            long remainingTime = targetTickTimeMillis - tickTime;
+                            if (remainingTime > 0) {
+                                Thread.sleep(remainingTime);
+                            }
                         }
-                    }
-                    catch (InterruptedException ignored) {}
+                        catch (InterruptedException ignored) {}
                 }
             }
         };
@@ -158,6 +211,7 @@ public class PGWindow {
     }
 
     public void update(double deltaTime) {
+
         frame.setTitle(title);
         Point pos = frame.getLocation();
         this.x = pos.x;
@@ -166,53 +220,59 @@ public class PGWindow {
         if (this.objects == null) {
             return;
         }
-        List<Object> objects = new ArrayList<>(Arrays.asList(this.objects));
 
-        objects.sort(new Comparator<Object>() {
-            @Override
-            public int compare(Object o1, Object o2) {
-                // again more redundant stuff
-                int layer1 = (o1 instanceof PGObject obj1)? obj1.getOrder() : 0;
-                int layer2 = (o2 instanceof PGObject obj2)? obj2.getOrder() : 0;
-                return -Integer.compare(layer1, layer2);
-            }
-        });
+        synchronized (threadLock) {
 
-        for (int i = 0; i < objects.size(); i++) {
-            Object o = objects.get(i);
-            // TODO: when the currently deprecated method add(Object o) gets removed,
-            //  this will be redundant because the global Object[] will be turned into a PGObject[].
-            if (o instanceof PGObject obj) {
-                if (obj.isGarbage()) {
-                    obj.onDispose();
-                    this.objects[i] = null; // should work tm
+            List<PGObject> objects = new ArrayList<>(this.objects);
+            List<PGObject> forRemoval = new LinkedList<>();
+
+            objects.sort(new Comparator<Object>() {
+                @Override
+                public int compare(Object o1, Object o2) {
+                    // again more redundant stuff
+                    int layer1 = (o1 instanceof PGObject obj1)? obj1.getOrder() : 0;
+                    int layer2 = (o2 instanceof PGObject obj2)? obj2.getOrder() : 0;
+                    return -Integer.compare(layer1, layer2);
                 }
+            });
+
+            for (PGObject o : objects) {
+
+                if (o instanceof Updatable u) {
+                    u.update(deltaTime);
+                }
+
+                if (o != null && o.isGarbage()) {
+                    o.onDispose();
+                    forRemoval.add(o);
+                }
+
             }
-            if (o instanceof Updatable u) {
-                u.update(deltaTime);
+
+            this.objects.removeAll(forRemoval);
+
+            // TODO: implement this in a better, more generic way
+            if (PGKeyboard.get().isKeyPressed(KeyEvent.VK_F11)) {
+                fullscreen = !fullscreen;
+                frame.dispose();
+
+                if (fullscreen) {
+                    frame.setUndecorated(true);
+                    frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                }
+                else {
+                    frame.setUndecorated(false);
+                    frame.pack();
+                    frame.setLocationRelativeTo(null);
+                    frame.setExtendedState(JFrame.NORMAL);
+                }
+                frame.setVisible(true);
             }
+
+            PGMouse.update();
+            PGKeyboard.update();
+            PGSoundManager.cleanSounds();
         }
-
-        // TODO: implement this in a better, more generic way
-        if (PGKeyboard.get().isKeyPressed(KeyEvent.VK_F11)) {
-            fullscreen = !fullscreen;
-            frame.dispose();
-
-            if (fullscreen) {
-                frame.setUndecorated(true);
-                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-            }
-            else {
-                frame.setUndecorated(false);
-                frame.pack();
-                frame.setLocationRelativeTo(null);
-                frame.setExtendedState(JFrame.NORMAL);
-            }
-            frame.setVisible(true);
-        }
-
-        PGMouse.update();
-        PGKeyboard.update();
     }
 
     private void exit() {
@@ -221,31 +281,39 @@ public class PGWindow {
                 e.onExit();
             }
         }
+
+        destroyOpenALContext();
+
         System.exit(EXIT_NORMAL);
     }
 
     public void render(Graphics2D g2) {
-        long startTimeMillis = System.currentTimeMillis();
-        long endTimeMillis;
-        g2.setColor(Color.BLACK);
-        g2.fillRect(0, 0, getInternalWidth(), getInternalHeight());
 
-        double targetTickTimeMillis = 1000d / tps;
+        synchronized (threadLock) {
 
-        for (Object o : objects) {
-            if (o instanceof Renderable r) {
-                double t = (double) (System.currentTimeMillis() - lastTickTimeMillis) / targetTickTimeMillis;
+            long startTimeMillis = System.currentTimeMillis();
+            long endTimeMillis;
 
-                t = PGMath.clamp(t, 0, 1);
+            for (Object o : objects) {
+                if (o instanceof Renderable r) {
+                    double t = getTickProgress();
 
-                g2.setColor(Color.WHITE);
-                r.render(g2, t);
+                    t = PGMath.clamp(t, 0, 1);
+
+                    g2.setColor(Color.WHITE);
+                    r.render(g2, t);
+                }
             }
+
+            endTimeMillis = System.currentTimeMillis();
+
+            lastFrameLengthMillis = endTimeMillis - startTimeMillis;
         }
+    }
 
-        endTimeMillis = System.currentTimeMillis();
-
-        lastFrameLengthMillis = endTimeMillis - startTimeMillis;
+    public double getTickProgress() {
+        double targetTickTimeMillis = 1000d / tps;
+        return PGMath.clamp(0, 1, (double) (System.currentTimeMillis() - lastTickTimeMillis) / targetTickTimeMillis);
     }
 
     public void setTitle(String title) {
@@ -255,23 +323,8 @@ public class PGWindow {
         frame.setIconImage(icon);
     }
 
-    @Deprecated(forRemoval = true)
-    public void add(Object o) {
-        for (int i = 0; i < objects.length; i++) {
-            if (objects[i] == null) {
-                objects[i] = o;
-                return;
-            }
-        }
-    }
-
     public void add(PGObject o) {
-        for (int i = 0; i < objects.length; i++) {
-            if (objects[i] == null) {
-                objects[i] = o;
-                return;
-            }
-        }
+        objects.add(o);
     }
 
     public int getWidth() {

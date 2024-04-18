@@ -13,8 +13,11 @@ public class PGPanel extends JPanel {
         this.w = w;
     }
 
+    private int activeRenderThreads = 0;
+
     @Override
     public void paintComponent(Graphics g) {
+        activeRenderThreads++;
 
         w.width = getWidth();
         w.height = getHeight();
@@ -48,6 +51,8 @@ public class PGPanel extends JPanel {
 
             g2.setTransform(old);
         }
+
+
     }
 
 }
