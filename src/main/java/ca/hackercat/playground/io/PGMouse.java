@@ -3,22 +3,25 @@ package ca.hackercat.playground.io;
 
 import ca.hackercat.logging.Logger;
 import ca.hackercat.playground.PGWindow;
+import ca.hackercat.playground.math.PGMath;
 
-import java.awt.AWTException;
-import java.awt.Component;
-import java.awt.Robot;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
-import java.util.Arrays;
 
 public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelListener {
+
+
+    private static final int BUTTON_COUNT = 10;
 
     public static final int BUTTON_LEFT = MouseEvent.BUTTON1;
     public static final int BUTTON_RIGHT = MouseEvent.BUTTON3;
     public static final int BUTTON_MIDDLE = MouseEvent.BUTTON2;
+
+    public static final int BUTTON_WHEEL_UP = BUTTON_COUNT + 1;
+    public static final int BUTTON_WHEEL_DOWN = BUTTON_COUNT + 2;
 
     private boolean locked;
 
@@ -30,8 +33,6 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
         }
         return instance;
     }
-
-    private static final int BUTTON_COUNT = 10;
 
     private boolean[] lastHeld = new boolean[BUTTON_COUNT];
     private boolean[] held = new boolean[BUTTON_COUNT];
@@ -186,7 +187,8 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
         if (ignoreMouseEvents) {
             return;
         }
-        vScroll += e.getPreciseWheelRotation();
+        double delta = e.getPreciseWheelRotation();
+        vScroll += delta;
     }
 
     public double getX() {
@@ -219,6 +221,12 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
     }
 
     public boolean isButtonPressed(int button) {
+        if (button == BUTTON_WHEEL_UP) {
+            return PGMath.round(getDScroll()) < 0;
+        }
+        if (button == BUTTON_WHEEL_DOWN) {
+            return PGMath.round(getDScroll()) > 0;
+        }
         if (button < 0 || button >= BUTTON_COUNT) {
             LOGGER.error("Button '" + button + "' out of range!");
             return false;

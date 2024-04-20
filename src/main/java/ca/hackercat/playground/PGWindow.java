@@ -39,7 +39,7 @@ public class PGWindow {
     private JFrame frame;
     private PGPanel panel;
 
-    private Object threadLock = new Object();
+    private final Object threadLock = new Object();
 
     private double tps = 30;
     private double fps = 60;
@@ -123,6 +123,7 @@ public class PGWindow {
         if (!alCapabilities.OpenAL10) {
             LOGGER.error("Audio library is not supported.");
         }
+
     }
 
     private void destroyOpenALContext() {
@@ -212,6 +213,24 @@ public class PGWindow {
 
     public void update(double deltaTime) {
 
+        // TODO: implement this in a better, more generic way
+        if (PGKeyboard.get().isKeyPressed(KeyEvent.VK_F11)) {
+            fullscreen = !fullscreen;
+            frame.dispose();
+
+            if (fullscreen) {
+                frame.setUndecorated(true);
+                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+            }
+            else {
+                frame.setUndecorated(false);
+                frame.pack();
+                frame.setLocationRelativeTo(null);
+                frame.setExtendedState(JFrame.NORMAL);
+            }
+            frame.setVisible(true);
+        }
+
         frame.setTitle(title);
         Point pos = frame.getLocation();
         this.x = pos.x;
@@ -251,24 +270,6 @@ public class PGWindow {
 
             this.objects.removeAll(forRemoval);
 
-            // TODO: implement this in a better, more generic way
-            if (PGKeyboard.get().isKeyPressed(KeyEvent.VK_F11)) {
-                fullscreen = !fullscreen;
-                frame.dispose();
-
-                if (fullscreen) {
-                    frame.setUndecorated(true);
-                    frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-                }
-                else {
-                    frame.setUndecorated(false);
-                    frame.pack();
-                    frame.setLocationRelativeTo(null);
-                    frame.setExtendedState(JFrame.NORMAL);
-                }
-                frame.setVisible(true);
-            }
-
             PGMouse.update();
             PGKeyboard.update();
             PGSoundManager.cleanSounds();
@@ -294,12 +295,10 @@ public class PGWindow {
             long startTimeMillis = System.currentTimeMillis();
             long endTimeMillis;
 
+            double t = getTickProgress();
+
             for (Object o : objects) {
                 if (o instanceof Renderable r) {
-                    double t = getTickProgress();
-
-                    t = PGMath.clamp(t, 0, 1);
-
                     g2.setColor(Color.WHITE);
                     r.render(g2, t);
                 }
@@ -313,7 +312,7 @@ public class PGWindow {
 
     public double getTickProgress() {
         double targetTickTimeMillis = 1000d / tps;
-        return PGMath.clamp(0, 1, (double) (System.currentTimeMillis() - lastTickTimeMillis) / targetTickTimeMillis);
+        return (double) (System.currentTimeMillis() - lastTickTimeMillis) / targetTickTimeMillis;
     }
 
     public void setTitle(String title) {

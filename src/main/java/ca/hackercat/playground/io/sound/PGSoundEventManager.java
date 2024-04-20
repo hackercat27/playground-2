@@ -18,13 +18,14 @@ public class PGSoundEventManager {
 
     private Map<String, byte[]> soundDataMap = new HashMap<>();
 
-    public void createSoundEvent(String name) {
+    public PGSound createSoundEvent(String name) {
         PGSound sound = getSound(name);
         if (sound == null) {
-            return;
+            return null;
         }
 
         sound.play();
+        return sound;
     }
     public void invokeSoundEvent(PGSoundEvent event) {
         PGSound sound = getSound(event);
