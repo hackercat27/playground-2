@@ -22,8 +22,8 @@ public class PGFontManager {
     public static final String ROBOTO_MONO = "RobotoMono";
 
     static {
-        register("/assets/font/OpenSans-Regular", OPEN_SANS);
-        register("/assets/font/RobotoMono-Regular", ROBOTO_MONO);
+        register("/assets/playground/font/OpenSans-Regular", OPEN_SANS);
+        register("/assets/playground/font/RobotoMono-Regular", ROBOTO_MONO);
     }
 
     public static void register(String fontPath, String name) {

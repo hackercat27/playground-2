@@ -6,6 +6,8 @@ import ca.hackercat.playground.PGWindow;
 
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.util.LinkedList;
+import java.util.List;
 
 public class PGKeyboard implements KeyListener {
 
@@ -32,6 +34,8 @@ public class PGKeyboard implements KeyListener {
         }
     }
 
+    private final List<KeyListener> listeners = new LinkedList<>();
+
     private final static int KEY_COUNT = 4096;
 
     private final boolean[] lastHeld = new boolean[KEY_COUNT];
@@ -39,10 +43,23 @@ public class PGKeyboard implements KeyListener {
 
 
     @Override
-    public void keyTyped(KeyEvent e) {}
+    public void keyTyped(KeyEvent e) {
+
+        synchronized (listeners) {
+            for (KeyListener kl : listeners) {
+                kl.keyTyped(e);
+            }
+        }
+
+    }
 
     @Override
     public void keyPressed(KeyEvent e) {
+        synchronized (listeners) {
+            for (KeyListener kl : listeners) {
+                kl.keyPressed(e);
+            }
+        }
         int code = e.getKeyCode();
         if (code >= KEY_COUNT || code < 0) {
             LOGGER.error("Code '" + code + "' is out of range!");
@@ -54,6 +71,11 @@ public class PGKeyboard implements KeyListener {
 
     @Override
     public void keyReleased(KeyEvent e) {
+        synchronized (listeners) {
+            for (KeyListener kl : listeners) {
+                kl.keyReleased(e);
+            }
+        }
         int code = e.getKeyCode();
         if (code >= KEY_COUNT || code < 0) {
             LOGGER.error("Code '" + code + "' is out of range!");
@@ -78,5 +100,14 @@ public class PGKeyboard implements KeyListener {
 
         return held[code] && !lastHeld[code];
 
+    }
+
+    public void addKeyListener(KeyListener kl) {
+        if (kl == null) {
+            return;
+        }
+        synchronized (listeners) {
+            listeners.add(kl);
+        }
     }
 }

@@ -5,20 +5,25 @@ import ca.hackercat.logging.Logger;
 import ca.hackercat.playground.PGWindow;
 import ca.hackercat.playground.math.PGMath;
 
+import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
+import java.util.LinkedList;
+import java.util.List;
 
 public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelListener {
 
 
     private static final int BUTTON_COUNT = 10;
 
-    public static final int BUTTON_LEFT = MouseEvent.BUTTON1;
-    public static final int BUTTON_RIGHT = MouseEvent.BUTTON3;
-    public static final int BUTTON_MIDDLE = MouseEvent.BUTTON2;
+    public static final int BUTTON_LEFT = 1;
+    public static final int BUTTON_MIDDLE = 2;
+    public static final int BUTTON_RIGHT = 3;
+    public static final int BUTTON4 = 4;
+    public static final int BUTTON5 = 5;
 
     public static final int BUTTON_WHEEL_UP = BUTTON_COUNT + 1;
     public static final int BUTTON_WHEEL_DOWN = BUTTON_COUNT + 2;
@@ -38,6 +43,10 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
     private boolean[] held = new boolean[BUTTON_COUNT];
 
     private static PGWindow window;
+
+    private final List<MouseListener> mouseListeners = new LinkedList<>();
+    private final List<MouseWheelListener> mouseWheelListeners = new LinkedList<>();
+    private final List<MouseMotionListener> mouseMotionListeners = new LinkedList<>();
 
     public static void setWindow(PGWindow w) {
         PGMouse.window = w;
@@ -123,10 +132,22 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
     }
 
     @Override
-    public void mouseClicked(MouseEvent e) {}
+    public void mouseClicked(MouseEvent e) {
+
+        synchronized (mouseListeners) {
+            for (MouseListener ml : mouseListeners) {
+                ml.mouseClicked(e);
+            }
+        }
+    }
 
     @Override
     public void mousePressed(MouseEvent e) {
+        synchronized (mouseListeners) {
+            for (MouseListener ml : mouseListeners) {
+                ml.mousePressed(e);
+            }
+        }
         if (ignoreMouseEvents) {
             return;
         }
@@ -140,6 +161,11 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
 
     @Override
     public void mouseReleased(MouseEvent e) {
+        synchronized (mouseListeners) {
+            for (MouseListener ml : mouseListeners) {
+                ml.mouseReleased(e);
+            }
+        }
         if (ignoreMouseEvents) {
             return;
         }
@@ -153,16 +179,31 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
 
     @Override
     public void mouseEntered(MouseEvent e) {
+        synchronized (mouseListeners) {
+            for (MouseListener ml : mouseListeners) {
+                ml.mouseEntered(e);
+            }
+        }
 
     }
 
     @Override
     public void mouseExited(MouseEvent e) {
+        synchronized (mouseListeners) {
+            for (MouseListener ml : mouseListeners) {
+                ml.mouseExited(e);
+            }
+        }
 
     }
 
     @Override
     public void mouseDragged(MouseEvent e) {
+        synchronized (mouseMotionListeners) {
+            for (MouseMotionListener ml : mouseMotionListeners) {
+                ml.mouseDragged(e);
+            }
+        }
         if (ignoreMouseEvents) {
             return;
         }
@@ -171,6 +212,11 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
 
     @Override
     public void mouseMoved(MouseEvent e) {
+        synchronized (mouseMotionListeners) {
+            for (MouseMotionListener ml : mouseMotionListeners) {
+                ml.mouseMoved(e);
+            }
+        }
         if (ignoreMouseEvents) {
             return;
         }
@@ -184,6 +230,11 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
 
     @Override
     public void mouseWheelMoved(MouseWheelEvent e) {
+        synchronized (mouseWheelListeners) {
+            for (MouseWheelListener ml : mouseWheelListeners) {
+                ml.mouseWheelMoved(e);
+            }
+        }
         if (ignoreMouseEvents) {
             return;
         }
@@ -274,5 +325,23 @@ public class PGMouse implements MouseListener, MouseMotionListener, MouseWheelLi
 
     public boolean isGrabbed() {
         return locked;
+    }
+
+    public void addMouseListener(MouseListener ml) {
+        synchronized (mouseListeners) {
+            mouseListeners.add(ml);
+        }
+    }
+
+    public void addMouseMotionListener(MouseMotionListener ml) {
+        synchronized (mouseMotionListeners) {
+            mouseMotionListeners.add(ml);
+        }
+    }
+
+    public void addMouseWheelListener(MouseWheelListener ml) {
+        synchronized (mouseWheelListeners) {
+            mouseWheelListeners.add(ml);
+        }
     }
 }

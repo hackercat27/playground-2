@@ -3,32 +3,25 @@ package ca.hackercat.playground;
 import ca.hackercat.logging.Logger;
 import ca.hackercat.playground.io.PGKeyboard;
 import ca.hackercat.playground.io.PGMouse;
-import ca.hackercat.playground.io.sound.PGSoundEventManager;
+import ca.hackercat.playground.io.PGWindowState;
 import ca.hackercat.playground.io.sound.PGSoundManager;
 import ca.hackercat.playground.math.PGMath;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.ALC;
 import org.lwjgl.openal.ALCCapabilities;
 import org.lwjgl.openal.ALCapabilities;
-import javax.swing.JFrame;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
-import java.awt.Point;
-import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 
 import static org.lwjgl.openal.ALC10.*;
-import static org.lwjgl.openal.ALC10.alcMakeContextCurrent;
 
 public class PGWindow {
 
@@ -36,13 +29,16 @@ public class PGWindow {
 
     public static final int EXIT_NORMAL = 0;
 
-    private JFrame frame;
-    private PGPanel panel;
+    private PGFrame frame;
+//    private PGPanel panel;
 
     private final Object threadLock = new Object();
 
-    private double tps = 30;
-    private double fps = 60;
+    private double targetTPS = 60;
+    private double targetFPS = 240;
+
+    private int currentTPS;
+    private int currentFPS;
 
     // OpenAL pointers
     private long audioContext;
@@ -61,10 +57,7 @@ public class PGWindow {
     int internalWidth = 854;
     int internalHeight = 480;
 
-    private int x;
-    private int y;
-
-    private boolean fullscreen = false;
+    private PGWindowState state = PGWindowState.WINDOWED;
 
     private String title;
 
@@ -86,68 +79,104 @@ public class PGWindow {
     }
 
     public PGWindow(int width, int height, String title) {
-        this.width = width;
-        this.height = height;
-        setTitle(title);
-        init();
+        this(width, height, title, false); // default to using Swing
     }
 
-    private void init() {
-        frame = new JFrame();
-        panel = new PGPanel(this, width, height);
+    public PGWindow(boolean forceOpenGL) {
+        this(854, 480, forceOpenGL);
+    }
 
-        frame.add(panel);
-        frame.pack();
-        frame.setLocationRelativeTo(null);
-        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+    public PGWindow(String title, boolean forceOpenGL) {
+        this(854, 480, title, forceOpenGL);
+    }
+
+    public PGWindow(int width, int height, boolean forceOpenGL) {
+        this(width, height, null, forceOpenGL);
+    }
+
+    public PGWindow(int width, int height, String title, boolean forceOpenGL) {
+
+        this.width = width;
+        this.height = height;
+        init(forceOpenGL);
+        setTitle(title);
+
+    }
+
+    private void init(boolean openGL) {
+        if (openGL) {
+            LOGGER.log("Initializing OpenGL frame.");
+            frame = new PGFrameGLFW(this, width, height, title);
+        }
+        else {
+            LOGGER.log("Initializing Swing frame.");
+            frame = new PGFrameSwing(this, width, height, title);
+        }
+
         frame.setVisible(true);
 
-        createOpenALContext();
-
-        start();
+        // TODO: this method freezes the engine on linux
+//        createOpenALContext();
     }
 
     private void createOpenALContext() {
+        LOGGER.log("Creating OpenAL context");
 
         String defaultDevice = alcGetString(0, ALC_DEFAULT_DEVICE_SPECIFIER);
+        LOGGER.log("got default device");
         audioDevice = alcOpenDevice(defaultDevice);
+        LOGGER.log("opened device");
 
         int[] attributes = new int[] {0};
         audioContext = alcCreateContext(audioDevice, attributes);
+        LOGGER.log("created context");
 
         alcMakeContextCurrent(audioContext);
+        LOGGER.log("made context current");
 
         alcCapabilities = ALC.createCapabilities(audioDevice);
+        LOGGER.log("created alc capabilities");
         alCapabilities = AL.createCapabilities(alcCapabilities);
+        LOGGER.log("created al capabilities");
 
         if (!alCapabilities.OpenAL10) {
             LOGGER.error("Audio library is not supported.");
         }
 
+        LOGGER.log("Finished initializing!");
+
     }
 
     private void destroyOpenALContext() {
 
-        alcMakeContextCurrent(audioContext);
-
-        alcCloseDevice(audioDevice);
-        alcDestroyContext(audioContext);
+        if (audioDevice != 0) {
+            alcMakeContextCurrent(audioContext);
+            alcCloseDevice(audioDevice);
+            audioDevice = 0;
+        }
+        if (audioContext != 0) {
+            alcDestroyContext(audioContext);
+            audioContext = 0;
+        }
 
     }
 
-    private void start() {
+    public void start() {
         PGMouse.setWindow(this);
         PGKeyboard.setWindow(this);
 
-        panel.addMouseListener(PGMouse.get());
-        panel.addMouseWheelListener(PGMouse.get());
-        panel.addMouseMotionListener(PGMouse.get());
+        frame.addMouseListener(PGMouse.get());
+        frame.addMouseWheelListener(PGMouse.get());
+        frame.addMouseMotionListener(PGMouse.get());
         frame.addKeyListener(PGKeyboard.get());
+
+        final boolean[] shouldClose = {false};
 
         frame.addWindowListener(new WindowListener() {
             @Override
             public void windowClosing(WindowEvent e) {
                 exit();
+                shouldClose[0] = false;
             }
 
             @Override public void windowOpened(WindowEvent e) {}
@@ -159,82 +188,89 @@ public class PGWindow {
         });
 
 
-        Runnable renderer = new Runnable() {
-            @Override
-            public void run() {
+        Runnable updater = () -> {
 
-                long targetFrameTimeMillis = (long) (1000 / fps);
-                while (true) {
-                    panel.repaint();
-                    try {
-                        long remainingTime = targetFrameTimeMillis - lastFrameLengthMillis;
-                        if (remainingTime > 0) {
-                            Thread.sleep(remainingTime);
-                        }
+            long lastTPSRefresh = System.currentTimeMillis();
+            PGWindow.this.currentTPS = (int) targetTPS; // so its not 0
 
-                    }
-                    catch (InterruptedException ignored) {}
+            int ticks = 0;
+
+            while (!shouldClose[0]) {
+                double targetTickTimeMillis = 1000d / targetTPS;
+
+                double deltaTime;
+                long startTimeMillis;
+                long endTimeMillis;
+
+                startTimeMillis = System.currentTimeMillis();
+
+                update(1d / targetTPS);
+                ticks++;
+
+                if (lastTPSRefresh - System.currentTimeMillis() >= 1000) {
+                    lastTPSRefresh = System.currentTimeMillis();
+                    currentTPS = ticks;
+                    ticks = 0;
                 }
+
+
+                endTimeMillis = System.currentTimeMillis();
+
+                deltaTime = startTimeMillis - endTimeMillis;
+
+                double millisUntilNextTick = targetTickTimeMillis - deltaTime;
+                long waitTime = PGMath.round(millisUntilNextTick);
+
+                if (waitTime > 0) {
+                    try {
+                        Thread.sleep(waitTime);
+                    }
+                    catch (InterruptedException e) {
+                        LOGGER.warn(e);
+                    }
+                }
+
             }
         };
-        Runnable updater = new Runnable() {
-            @Override
-            public void run() {
+        Runnable renderer = () -> {
 
-                long endTimeMillis;
-                long startTimeMillis;
-                while (true) {
-                        long targetTickTimeMillis = (long) (1000 / tps);
 
-                        startTimeMillis = System.currentTimeMillis();
+            long endTimeMillis;
+            long startTimeMillis;
 
-                        try {
-                            update(1d / tps);
+//            double millisUntilNextTick = 0;
+            double millisUntilNextFrame = 0;
 
-                            endTimeMillis = System.currentTimeMillis();
+            long lastFPSRefresh = System.currentTimeMillis();
+            int frames = (int) targetFPS;
 
-                            lastTickTimeMillis = endTimeMillis;
+            while (!shouldClose[0]) {
+                double targetFrameTimeMillis = 1000d / targetFPS;
 
-                            long tickTime = endTimeMillis - startTimeMillis;
+                frames++;
 
-                            long remainingTime = targetTickTimeMillis - tickTime;
-                            if (remainingTime > 0) {
-                                Thread.sleep(remainingTime);
-                            }
-                        }
-                        catch (InterruptedException ignored) {}
+                if (lastFPSRefresh - System.currentTimeMillis() >= 1000) {
+                    lastFPSRefresh = System.currentTimeMillis();
+                    currentFPS = frames;
+                    frames = 0;
+
                 }
+
+                frame.poll();
+                frame.drawFrame(targetFrameTimeMillis);
             }
+
         };
 
         new Thread(renderer, "engine-renderer").start();
         new Thread(updater, "engine-update").start();
+//        renderer.run(); // bad but "i'll fix it later"
     }
 
     public void update(double deltaTime) {
 
-        // TODO: implement this in a better, more generic way
-        if (PGKeyboard.get().isKeyPressed(KeyEvent.VK_F11)) {
-            fullscreen = !fullscreen;
-            frame.dispose();
-
-            if (fullscreen) {
-                frame.setUndecorated(true);
-                frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-            }
-            else {
-                frame.setUndecorated(false);
-                frame.pack();
-                frame.setLocationRelativeTo(null);
-                frame.setExtendedState(JFrame.NORMAL);
-            }
-            frame.setVisible(true);
-        }
-
-        frame.setTitle(title);
-        Point pos = frame.getLocation();
-        this.x = pos.x;
-        this.y = pos.y;
+        // probably unnecessary?
+//        frame.setTitle(title);
 
         if (this.objects == null) {
             return;
@@ -273,7 +309,14 @@ public class PGWindow {
             PGMouse.update();
             PGKeyboard.update();
             PGSoundManager.cleanSounds();
+
+            lastTickTimeMillis = System.currentTimeMillis();
         }
+    }
+
+    public void setWindowState(PGWindowState state) {
+        // wrapper method
+        frame.setState(state);
     }
 
     private void exit() {
@@ -284,6 +327,10 @@ public class PGWindow {
         }
 
         destroyOpenALContext();
+
+        if (frame != null) {
+            frame.close();
+        }
 
         System.exit(EXIT_NORMAL);
     }
@@ -311,13 +358,18 @@ public class PGWindow {
     }
 
     public double getTickProgress() {
-        double targetTickTimeMillis = 1000d / tps;
+        double targetTickTimeMillis = 1000d / targetTPS;
         return (double) (System.currentTimeMillis() - lastTickTimeMillis) / targetTickTimeMillis;
     }
 
     public void setTitle(String title) {
+        if (title == null) {
+            title = "";
+        }
         this.title = title;
+        frame.setTitle(title);
     }
+
     public void setIcon(BufferedImage icon) {
         frame.setIconImage(icon);
     }
@@ -334,14 +386,6 @@ public class PGWindow {
         return height;
     }
 
-    public int getX() {
-        return x;
-    }
-
-    public int getY() {
-        return y;
-    }
-
     public int getInternalWidth() {
         return internalWidth;
     }
@@ -350,7 +394,7 @@ public class PGWindow {
     }
 
     public void setTPS(double tps) {
-        this.tps = tps;
+        this.targetTPS = tps;
     }
 
     public void setAutoScale(boolean autoScale) {
@@ -359,5 +403,17 @@ public class PGWindow {
 
     public boolean isAutoScale() {
         return autoScale;
+    }
+
+    public PGWindowState getState() {
+        return state;
+    }
+
+    public int getTPS() {
+        return currentTPS;
+    }
+
+    public int getFPS() {
+        return currentFPS;
     }
 }

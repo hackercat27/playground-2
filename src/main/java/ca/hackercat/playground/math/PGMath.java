@@ -7,8 +7,10 @@ public class PGMath {
 
     public static final double PI = 3.141592653589793d;
     public static final double TAU = 6.283185307179586;
+    public static final double E = 2.718281828459045d;
     public static final float PIf = 3.1415927f;
     public static final float TAUf = 6.2831855f;
+    public static final float Ef = 2.7182817f;
     private static final double DG_RDd = 0.017453292519943295;
     private static final double RD_DGd = 57.29577951308232;
     private static final float DG_RDf = 0.017453292f;
@@ -21,6 +23,22 @@ public class PGMath {
     }
     public static float randomf() {
         return random.nextFloat();
+    }
+
+    public static double randomdNormal() {
+        return randomdNormal(random);
+    }
+
+    // mean = 0 and sd = 1
+    public static double randomdNormal(Random rand) {
+        double theta = TAU * rand.nextDouble();
+        double rho = sqrt(-2 * ln(rand.nextDouble()));
+        return rho * cos(theta);
+    }
+    public static float randomfNormal(Random rand) {
+        float theta = TAUf * randomf();
+        float rho = sqrt(-2 * ln(randomf()));
+        return rho * cos(theta);
     }
 
     public static float sin(float a) {
@@ -221,20 +239,20 @@ public class PGMath {
         return (int) copySign(abs(a) + 1f, a);
     }
     public static int floor(float a) {
-        return (int) a;
+        return (int) Math.floor(a);
     }
     public static int ceiling(float a) {
-        return (int) copySign(abs(a) + 1f, a);
+        return -floor(-a);
     }
     public static int floorStrict(float a) {
         if (a < 0) {
-            return ceiling(a);
+            return floor(a) - 1;
         }
         return floor(a);
     }
     public static int ceilingStrict(float a) {
         if (a < 0) {
-            return floor(a);
+            return ceiling(a) + 1;
         }
         return ceiling(a);
     }
@@ -242,19 +260,19 @@ public class PGMath {
     public static long round(double a) {
         double remainder = abs(a % 1);
         if (remainder < 0.5) {
-            return (long) a;
+            return floor(a);
         }
-        return (long) copySign(abs(a) + 1d, a);
+        return ceiling(a);
     }
     public static long floor(double a) {
         return (long) a;
     }
     public static long ceiling(double a) {
-        return (long) copySign(abs(a) + 1f, a);
+        return (long) Math.ceil(a);
     }
     public static long floorStrict(double a) {
         if (a < 0) {
-            return ceiling(a);
+            return floor(a) - 1;
         }
         return floor(a);
     }
@@ -353,6 +371,10 @@ public class PGMath {
         return c;
     }
 
+    public static float sqrt(float a) {
+        return (float) Math.sqrt(a);
+    }
+
     public static double sqrt(double a) {
         return Math.sqrt(a);
     }
@@ -404,5 +426,13 @@ public class PGMath {
 
     public static float ln(float a) {
         return (float) Math.log(a);
+    }
+
+    public static double exp(double x) {
+        return Math.exp(x);
+    }
+
+    public static float exp(float x) {
+        return (float) Math.exp(x);
     }
 }

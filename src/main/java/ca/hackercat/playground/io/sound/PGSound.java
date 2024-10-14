@@ -30,15 +30,21 @@ public class PGSound {
     private float currentY;
     private float currentZ;
 
+    private float originX;
+    private float originY;
+    private float originZ;
+
+
     private final Object sourceLock = new Object();
 
-    public PGSound(byte[] data, String path, boolean loops) {
+    public PGSound(PGSoundEventManager parent, byte[] data, String path, boolean loops) {
         init(data, path, loops);
+
     }
-    public PGSound(byte[] data, boolean loops) {
+    public PGSound(PGSoundEventManager parent, byte[] data, boolean loops) {
         init(data, "memory", loops);
     }
-    public PGSound(String path, boolean loops) {
+    public PGSound(PGSoundEventManager parent, String path, boolean loops) {
         InputStream is = PGFileUtils.getInputStream(path);
         byte[] data;
 
@@ -51,6 +57,19 @@ public class PGSound {
         }
 
         init(data, path, loops);
+    }
+
+    public void setOrigin(float x, float y, float z) {
+
+        if (x == originX && y == originY && z == originZ) {
+            return;
+        }
+
+        this.originX = x;
+        this.originY = y;
+        this.originZ = z;
+
+        updatePosition();
     }
 
     private void init(byte[] data, String path, boolean loops) {
@@ -69,7 +88,6 @@ public class PGSound {
     private void initVorbis(byte[] data, String path, boolean loops) {
 
         synchronized (sourceLock) {
-            LOGGER.log("start of init");
             logErrors();
 
             // allocate space
@@ -82,37 +100,6 @@ public class PGSound {
             inBuffer.put(data).flip();
 
             ShortBuffer rawAudioBuffer = stb_vorbis_decode_memory(inBuffer, channelsBuffer, sampleRateBuffer);
-
-//        List<Short> shorts = new ArrayList<>();
-//
-//        try {
-//            for (;;) {
-//                shorts.add(rawAudioBuffer.get());
-//            }
-//        }
-//        catch (BufferUnderflowException ignored) {
-//
-//        }
-//
-//        File out = new File("out.wav");
-//        try {
-//            OutputStream fw = new FileOutputStream(out);
-//
-//            for (short s : shorts) {
-//
-//                int hi = (s >>> 8) & 0xFF;
-//                int low = s & 0xFF;
-//
-//                fw.write(low);
-//                fw.write(hi);
-//
-//            }
-//            fw.close();
-//        }
-//        catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
-//        return;
 
 
             if (rawAudioBuffer == null) {
@@ -192,7 +179,11 @@ public class PGSound {
         currentX = x;
         currentY = y;
         currentZ = z;
-        alSource3f(source, AL_POSITION, x, y, z);
+        updatePosition();
+    }
+
+    private void updatePosition() {
+        alSource3f(source, AL_POSITION, currentX - originX, currentY - originY, currentZ - originZ);
     }
 
     public void close() {
@@ -229,9 +220,9 @@ public class PGSound {
     }
 
     private void logErrors() {
-        int err = alGetError();
-        if (err != 0) {
-            LOGGER.error("OpenAL error " + err);
-        }
+//        int err = alGetError();
+//        if (err != 0) {
+//            LOGGER.error("OpenAL error " + err);
+//        }
     }
 }

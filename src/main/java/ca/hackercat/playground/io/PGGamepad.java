@@ -6,7 +6,6 @@ import com.github.strikerx3.jxinput.XInputButtons;
 import com.github.strikerx3.jxinput.XInputDevice;
 import com.github.strikerx3.jxinput.enums.XInputAxis;
 import com.github.strikerx3.jxinput.enums.XInputButton;
-import com.github.strikerx3.jxinput.exceptions.XInputNotLoadedException;
 
 public class PGGamepad {
 
@@ -28,12 +27,12 @@ public class PGGamepad {
 
     private PGGamepad(int playerNum) {
         this.playerNum = playerNum;
-        try {
-            device = XInputDevice.getDeviceFor(playerNum);
-        }
-        catch (XInputNotLoadedException e) {
-            LOGGER.warn("XInput is not available!");
-        }
+//        try {
+//            device = XInputDevice.getDeviceFor(playerNum);
+//        }
+//        catch (XInputNotLoadedException e) {
+//            LOGGER.warn("XInput is not available!");
+//        }
     }
     private static PGGamepad[] instances = new PGGamepad[4];
 

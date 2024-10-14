@@ -8,16 +8,14 @@ import java.awt.geom.AffineTransform;
 public class PGPanel extends JPanel {
 
     private PGWindow w;
+
     public PGPanel(PGWindow w, int width, int height) {
         setPreferredSize(new Dimension(width, height));
         this.w = w;
     }
 
-    private int activeRenderThreads = 0;
-
     @Override
     public void paintComponent(Graphics g) {
-        activeRenderThreads++;
 
         w.width = getWidth();
         w.height = getHeight();

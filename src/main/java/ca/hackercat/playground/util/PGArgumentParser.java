@@ -1,4 +1,4 @@
-package ca.hackercat.playground.io;
+package ca.hackercat.playground.util;
 
 import ca.hackercat.logging.Logger;
 

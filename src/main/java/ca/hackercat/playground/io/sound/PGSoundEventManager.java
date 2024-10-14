@@ -16,14 +16,20 @@ public class PGSoundEventManager {
 
     private PGSoundEvent[] events;
 
+    private Float x, y, z;
+
     private Map<String, byte[]> soundDataMap = new HashMap<>();
 
     public PGSound createSoundEvent(String name) {
+        return createSoundEvent(name, 0, 0, 0);
+    }
+    public PGSound createSoundEvent(String name, float x, float y, float z) {
         PGSound sound = getSound(name);
         if (sound == null) {
             return null;
         }
 
+        sound.setOrigin(x, y, z);
         sound.play();
         return sound;
     }
@@ -95,6 +101,12 @@ public class PGSoundEventManager {
             }
         }
 
-        return new PGSound(data, path, event.loop);
+        return new PGSound(this, data, path, event.loop);
+    }
+
+    public void setDefaultOrigin(float x, float y, float z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
     }
 }
