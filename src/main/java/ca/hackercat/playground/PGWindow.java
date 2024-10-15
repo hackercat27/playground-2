@@ -79,44 +79,23 @@ public class PGWindow {
     }
 
     public PGWindow(int width, int height, String title) {
-        this(width, height, title, false); // default to using Swing
-    }
-
-    public PGWindow(boolean forceOpenGL) {
-        this(854, 480, forceOpenGL);
-    }
-
-    public PGWindow(String title, boolean forceOpenGL) {
-        this(854, 480, title, forceOpenGL);
-    }
-
-    public PGWindow(int width, int height, boolean forceOpenGL) {
-        this(width, height, null, forceOpenGL);
-    }
-
-    public PGWindow(int width, int height, String title, boolean forceOpenGL) {
 
         this.width = width;
         this.height = height;
-        init(forceOpenGL);
+        init();
         setTitle(title);
 
     }
 
-    private void init(boolean openGL) {
-        if (openGL) {
-            LOGGER.log("Initializing OpenGL frame.");
-            frame = new PGFrameGLFW(this, width, height, title);
-        }
-        else {
-            LOGGER.log("Initializing Swing frame.");
-            frame = new PGFrameSwing(this, width, height, title);
-        }
+    private void init() {
+
+        LOGGER.log("Initializing Swing frame.");
+        frame = new PGFrameSwing(this, width, height, title);
+
 
         frame.setVisible(true);
 
-        // TODO: this method freezes the engine on linux
-//        createOpenALContext();
+        createOpenALContext();
     }
 
     private void createOpenALContext() {

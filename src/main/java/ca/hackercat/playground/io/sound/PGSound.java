@@ -101,7 +101,6 @@ public class PGSound {
 
             ShortBuffer rawAudioBuffer = stb_vorbis_decode_memory(inBuffer, channelsBuffer, sampleRateBuffer);
 
-
             if (rawAudioBuffer == null) {
                 LOGGER.error("Error getting audio data for '" + path + "'");
                 return;
